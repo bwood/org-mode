@@ -47,12 +47,17 @@ Could probably be refined, but for now:
       #+end_example
       =3eda41c= is the sha we need later. (Maybe there's an easier way to find this SHA -- could we use the pin sha in the above-linked recipe?)
 2. Checkout main branch in this repo.
-   1. If you don't have an upstream remote configured add one with =git remote add  git@github-bwood.com:emacs-straight/org-mode.git=
-3. Each of our "releases" is a branch.  E.g. the current release branch is 9.6.  If we are going to 9.7, make a new 9.7 branch off the 9.6 branch then:
+   1. If you don't have an upstream remote configured add one with:
+      #+begin_example
+      git remote add upstream git@github.com:emacs-straight/org-mode.git
+      #+end_example
+
+3. If we are going to org-mode version 9.7, make a new 9.7 branch off the main branch then:
    #+begin_example
    git pull upstream
    git reset --hard 3eda41c
    #+end_example
+   We do the reset to get this repo to the same commit that Doom is using.
 4. Apply our patches
    #+begin_example
    ✔ ~/code/lisp/org-mode [9.6 L|●1]
@@ -62,7 +67,10 @@ Could probably be refined, but for now:
    Hunk #2 succeeded at 2856 (offset 7 lines).
    #+end_example
    (If these don't apply, figure out what's changed in org-mode.)
-5. Commit the patched files to your new branch and push them up to its remote.
+5. Test org-mode by running =doom sync -u= and the restarting Doom.
+6. Commit the patched files to your new branch and push them up to its remote.
+7. Merge your release branch to main and push the changes to main's remote branch.
+8. Tag this release.
 
 * Restart emacs after syncing org-mode
 After =doom sync -u= do a complete restart of emacs, not just a =doom/reload=.  I think this is needed because the updated org-mode function is called by [[https://github.com/bwood/doom.d/blob/main/bdw/clocktable-flat.el][bdw/clocktable-flat.el]].
