@@ -1,0 +1,108 @@
+-*- mode: org; fill-column:70 -*-
+* Modifications
+** step-headers-off
+When using =.doom.d/bdw/clocktable-flat.el= I need a way to disable step headers in the csv export. Forking org was the best solution I found.
+*** Other solutions
+**** el-patch
+This might work. ([[https://www.reddit.com/r/emacs/comments/bhlxmd/where_is_the_proper_way_of_rewriting_or_replacing/eluo8zm/?utm_source=share&utm_medium=web2x&context=3][Reddit thread]].) But not straightforward to me and I'm not sure if it offers advantages... Revisit?
+**** advice/defadvice (doesnt' meet requirements)
+I believe you can only add code that runs before or after a function.  I needed to modify the function.
+* Installation in Doom Emacs
+** packages.el
+[[https://github.com/doomemacs/doomemacs/blob/develop/docs/getting_started.org#changing-a-recipe-for-an-included-package][Instructions on overriding recipes]].
+
+#+begin_example
+(package! org-mode
+  :recipe (:host github
+           :repo "bwood/org-mode"
+           :branch "9.6"
+           :build t
+           :pre-build
+           (with-temp-file "org-version.el"
+             (let ((version
+                    (with-temp-buffer
+                      (insert-file-contents (doom-path "lisp/org.el") nil 0 1024)
+                      (if (re-search-forward "^;; Version: \\([^\n-]+\\)" nil t)
+                          (match-string-no-properties 1)
+                        "Unknown"))))
+               (insert (format "(defun org-release () %S)\n" version)
+                       (format "(defun org-git-version (&rest _) \"%s-??-%s\")\n"
+                               version (cdr (doom-call-process "git" "rev-parse" "--short" "HEAD")))
+                       "(provide 'org-version)\n")))))
+#+end_example
+
+
+Doom installs =org= as a "language." See =lang: org= in init.el. Org-mode needs build customizations for doom.  Everything after =:branch= in the recipe above comes from the [[https://github.com/doomemacs/doomemacs/blob/develop/modules/lang/org/packages.el#L17-L29][org recipe]] in Doom's core packages.el.  We need to copy this exact =:pre-build= code to our packages.el for =doom sync -u= to work.
+
+I figured this out from [[https://github.com/doomemacs/doomemacs/issues/5721#issuecomment-974824939][this hlissner comment]].
+
+* Procedure to update this when you want a newer version of org-mode
+Could probably be refined, but for now:
+
+1. Need to know what version of org-mode is in use by the Doom version to which you've just updated.
+   1. Comment out our custom org-recipe above and update Doom.
+   2. When Doom is updated, =M-x org-version= then =C-h e= to find it in *Messages*:
+      #+begin_example
+      Org mode version 9.6 (9.6-??-3eda41c @ /Users/bwood/.emacs.d/.local/straight/build-27.2/org-mode/)
+      #+end_example
+      =3eda41c= is the sha we need later. (Maybe there's an easier way to find this SHA -- could we use the pin sha in the above-linked recipe?)
+2. Checkout main branch in this repo.
+   1. If you don't have an upstream remote configured add one with:
+      #+begin_example
+      git remote add upstream git@github.com:emacs-straight/org-mode.git
+      #+end_example
+
+3. If we are going to org-mode version 9.6-??-bed47b437, make a new 9.6-bed47b437 branch directly from the upstream:
+   #+begin_example
+   17:08 $ gco main
+   Switched to branch 'main'
+   Your branch is up to date with 'origin/main'.
+   
+   ✔ ~/code/lisp/org-mode [main {origin/main}|✔]
+   17:09 $ git fetch upstream
+   
+   ✔ ~/code/lisp/org-mode [main {origin/main}|✔]
+   17:09 $ git checkout -b 9.6-bed47b437 upstream/main
+   Branch '9.6-bed47b437' set up to track remote branch 'main' from 'upstream'.
+   Switched to a new branch '9.6-bed47b437'
+   #+end_example
+   
+4. Reset to the commit that Doom is using.   
+   #+begin_example
+   ~/code/lisp/org-mode [9.6-bed47b437 {upstream/main}|✔]
+   17:12 $ git reset --hard bed47b437
+   HEAD is now at bed47b437 test-ob-java: Test Java source block header arguments at all levels   
+   #+end_example   
+5. Apply our patches
+
+   First we need to get the patch code from our main branch.
+   #+begin_example
+   ✔ ~/code/lisp/org-mode [9.6-bed47b437 {upstream/main} ↓·349|✔]
+   17:16 $ git checkout main -- patches/step-headers-off.patch
+   
+   ✔ ~/code/lisp/org-mode [9.6-bed47b437 {upstream/main} ↓·349|●1]
+   17:23 $ gs
+   On branch 9.6-bed47b437
+   Your branch is behind 'upstream/main' by 349 commits, and can be fast-forwarded.
+     (use "git pull" to update your local branch)
+
+   Changes to be committed:
+     (use "git restore --staged <file>..." to unstage)
+    	new file:   patches/step-headers-off.patch
+   #+end_example
+   
+   #+begin_example
+   14:52 $ patch -p1 < patches/step-headers-off.patch
+   patching file lisp/org-clock.el
+   Hunk #1 succeeded at 2826 (offset 7 lines).
+   Hunk #2 succeeded at 2856 (offset 7 lines).
+   #+end_example
+   (If these don't apply, figure out what's changed in org-mode.)
+6. Make sure that our org-mode recipe is uncommented in doom packages.el. Update the =:branch= value in the receipe to reflect the name of the branch we've just created (9.6-bed47b437).
+7. Test org-mode by running =doom sync -u= and the restarting Doom. Verify the modified step-headers functionality by running one of the CSV report lines.
+8. Commit the patched files to your new branch and push them up to its remote.                                    
+9. Merge your release branch to main and push the changes to main's remote branch.
+10. Tag this release.
+
+* Restart emacs after syncing org-mode
+After =doom sync -u= do a complete restart of emacs, not just a =doom/reload=.  I think this is needed because the updated org-mode function is called by [[https://github.com/bwood/doom.d/blob/main/bdw/clocktable-flat.el][bdw/clocktable-flat.el]].
