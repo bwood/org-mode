@@ -52,25 +52,57 @@ Could probably be refined, but for now:
       git remote add upstream git@github.com:emacs-straight/org-mode.git
       #+end_example
 
-3. If we are going to org-mode version 9.7, make a new 9.7 branch off the main branch then:
+3. If we are going to org-mode version 9.6-??-bed47b437, make a new 9.6-bed47b437 branch directly from the upstream:
    #+begin_example
-   git pull upstream
-   git reset --hard 3eda41c
+   17:08 $ gco main
+   Switched to branch 'main'
+   Your branch is up to date with 'origin/main'.
+   
+   ✔ ~/code/lisp/org-mode [main {origin/main}|✔]
+   17:09 $ git fetch upstream
+   
+   ✔ ~/code/lisp/org-mode [main {origin/main}|✔]
+   17:09 $ git checkout -b 9.6-bed47b437 upstream/main
+   Branch '9.6-bed47b437' set up to track remote branch 'main' from 'upstream'.
+   Switched to a new branch '9.6-bed47b437'
    #+end_example
-   We do the reset to get this repo to the same commit that Doom is using.
-4. Apply our patches
+   
+4. Reset to the commit that Doom is using.   
    #+begin_example
-   ✔ ~/code/lisp/org-mode [9.6 L|●1]
+   ~/code/lisp/org-mode [9.6-bed47b437 {upstream/main}|✔]
+   17:12 $ git reset --hard bed47b437
+   HEAD is now at bed47b437 test-ob-java: Test Java source block header arguments at all levels   
+   #+end_example   
+5. Apply our patches
+
+   First we need to get the patch code from our main branch.
+   #+begin_example
+   ✔ ~/code/lisp/org-mode [9.6-bed47b437 {upstream/main} ↓·349|✔]
+   17:16 $ git checkout main -- patches/step-headers-off.patch
+   
+   ✔ ~/code/lisp/org-mode [9.6-bed47b437 {upstream/main} ↓·349|●1]
+   17:23 $ gs
+   On branch 9.6-bed47b437
+   Your branch is behind 'upstream/main' by 349 commits, and can be fast-forwarded.
+     (use "git pull" to update your local branch)
+
+   Changes to be committed:
+     (use "git restore --staged <file>..." to unstage)
+    	new file:   patches/step-headers-off.patch
+   #+end_example
+   
+   #+begin_example
    14:52 $ patch -p1 < patches/step-headers-off.patch
    patching file lisp/org-clock.el
    Hunk #1 succeeded at 2826 (offset 7 lines).
    Hunk #2 succeeded at 2856 (offset 7 lines).
    #+end_example
    (If these don't apply, figure out what's changed in org-mode.)
-5. Test org-mode by running =doom sync -u= and the restarting Doom.
-6. Commit the patched files to your new branch and push them up to its remote.
-7. Merge your release branch to main and push the changes to main's remote branch.
-8. Tag this release.
+6. Make sure that our org-mode recipe is uncommented in doom packages.el. Update the =:branch= value in the receipe to reflect the name of the branch we've just created (9.6-bed47b437).
+7. Test org-mode by running =doom sync -u= and the restarting Doom. Verify the modified step-headers functionality by running one of the CSV report lines.
+8. Commit the patched files to your new branch and push them up to its remote.                                    
+9. Merge your release branch to main and push the changes to main's remote branch.
+10. Tag this release.
 
 * Restart emacs after syncing org-mode
 After =doom sync -u= do a complete restart of emacs, not just a =doom/reload=.  I think this is needed because the updated org-mode function is called by [[https://github.com/bwood/doom.d/blob/main/bdw/clocktable-flat.el][bdw/clocktable-flat.el]].
